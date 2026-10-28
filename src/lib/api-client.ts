@@ -74,3 +74,39 @@ export async function apiClient<T = any>(
   return data.data as T;
 }
 
+apiClient.get = async function <T = any>(endpoint: string, options?: RequestInit) {
+  const data = await apiClient<T>(endpoint, { ...options, method: 'GET' });
+  return { data };
+};
+
+apiClient.post = async function <T = any>(endpoint: string, body?: any, options?: RequestInit) {
+  const data = await apiClient<T>(endpoint, {
+    ...options,
+    method: 'POST',
+    body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  });
+  return { data };
+};
+
+apiClient.patch = async function <T = any>(endpoint: string, body?: any, options?: RequestInit) {
+  const data = await apiClient<T>(endpoint, {
+    ...options,
+    method: 'PATCH',
+    body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  });
+  return { data };
+};
+
+apiClient.put = async function <T = any>(endpoint: string, body?: any, options?: RequestInit) {
+  const data = await apiClient<T>(endpoint, {
+    ...options,
+    method: 'PUT',
+    body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+  });
+  return { data };
+};
+
+apiClient.delete = async function <T = any>(endpoint: string, options?: RequestInit) {
+  const data = await apiClient<T>(endpoint, { ...options, method: 'DELETE' });
+  return { data };
+};
