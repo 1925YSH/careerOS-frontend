@@ -195,3 +195,4 @@ export function FilterRail({ filters, onChange, onReset, totalCount }: FilterRai
     </aside>
   );
 }
+

@@ -221,3 +221,4 @@ export function JobCard({ job }: JobCardProps) {
     </div>
   );
 }
+
