@@ -193,3 +193,4 @@ export default function CandidateLayout({ children }: CandidateLayoutProps) {
     </div>
   );
 }
+
