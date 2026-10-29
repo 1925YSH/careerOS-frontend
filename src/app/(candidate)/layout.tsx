@@ -40,6 +40,7 @@ export default function CandidateLayout({ children }: CandidateLayoutProps) {
 
   const navItems = [
     { label: 'Overview', href: '/app', icon: LayoutDashboard },
+    { label: 'AI Career Agent', href: '/app/career-agent', icon: Sparkles },
     { label: 'Jobs for You', href: '/app/jobs', icon: Compass },
     { label: 'Applications', href: '/app/applications', icon: Briefcase },
     { label: 'Resume Center', href: '/app/resume', icon: FileText },
