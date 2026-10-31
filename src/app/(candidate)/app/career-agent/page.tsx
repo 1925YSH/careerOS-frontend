@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -13,10 +13,14 @@ import {
   FileText,
   Clock,
   CheckCircle2,
+  Circle,
   ArrowRight,
   TrendingUp,
   BrainCircuit,
   MessageSquare,
+  Plus,
+  Trash2,
+  Calendar,
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -27,9 +31,24 @@ interface ChatMessage {
   actions?: string[];
 }
 
+interface CareerTask {
+  _id: string;
+  title: string;
+  type: string;
+  priority: string;
+  status: 'pending' | 'completed' | 'in_progress';
+  dueAt: string;
+  payload?: {
+    milestoneDay?: number;
+    description?: string;
+    companyName?: string;
+  };
+}
+
 export default function CareerAgentPage() {
   const { user, profile } = useAuth();
   const candidate = profile && 'skills' in profile ? (profile as any) : null;
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -45,6 +64,27 @@ export default function CareerAgentPage() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Live Task State
+  const [tasks, setTasks] = useState<CareerTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [generatingRoadmap, setGeneratingRoadmap] = useState(false);
+
+  const fetchTasks = async () => {
+    try {
+      setTasksLoading(true);
+      const res = await apiClient<{ count: number; tasks: CareerTask[] }>('/agent/tasks');
+      setTasks(res.tasks || []);
+    } catch (err) {
+      console.error('Failed to load career tasks:', err);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
 
   const handleSendMessage = async (textToSend?: string) => {
     const messageText = textToSend || input;
@@ -62,7 +102,11 @@ export default function CareerAgentPage() {
     setLoading(true);
 
     try {
-      const res = await apiClient<{ message: string; suggestedActions?: string[] }>('/agent/chat', {
+      const res = await apiClient<{
+        message: string;
+        suggestedActions?: string[];
+        toolInvocations?: any[];
+      }>('/agent/chat', {
         method: 'POST',
         body: JSON.stringify({ message: messageText }),
       });
@@ -70,27 +114,29 @@ export default function CareerAgentPage() {
       const agentMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'agent',
-        text:
-          res.message ||
-          `Based on your profile with ${candidate?.yearsOfExperience || 3}+ years of experience, here is my tailored analysis: You have strong alignment with modern distributed systems roles. Focusing on System Design and Cloud infrastructure will elevate your match rate from 78% to 92%.`,
+        text: res.message,
         timestamp: new Date(),
         actions: res.suggestedActions || [
           'View matching roles with >80% score',
-          'Optimize resume for Cloud/Distributed Systems',
+          'Review active career tasks',
         ],
       };
 
       setMessages((prev) => [...prev, agentMsg]);
+
+      // If a roadmap or task was created by the agent, reload the task list
+      if (res.toolInvocations?.some((t: any) => t.tool === 'generateRoadmap' || t.tool === 'createCareerTask')) {
+        fetchTasks();
+      }
     } catch {
-      // Fallback response for offline or testing mode
       const fallbackMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'agent',
         text: `Analysis complete: Comparing your background with verified listings. Your core competencies in React, TypeScript, and Node.js provide strong match density. Recommendations: Highlight production distributed architectures and CI/CD pipelines to boost visibility for Senior listings.`,
         timestamp: new Date(),
         actions: [
+          'Generate a 7-day technical interview prep plan',
           'Explore Personalized Job Feed',
-          'Review ATS Resume Score',
         ],
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -99,8 +145,58 @@ export default function CareerAgentPage() {
     }
   };
 
+  const handleToggleTaskStatus = async (task: CareerTask) => {
+    const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
+    try {
+      // Optimistic update
+      setTasks((prev) =>
+        prev.map((t) => (t._id === task._id ? { ...t, status: nextStatus } : t))
+      );
+      await apiClient(`/agent/tasks/${task._id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+    } catch (err: any) {
+      alert(`Failed to update task: ${err.message}`);
+      fetchTasks();
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+      await apiClient(`/agent/tasks/${taskId}`, { method: 'DELETE' });
+    } catch (err: any) {
+      alert(`Failed to delete task: ${err.message}`);
+      fetchTasks();
+    }
+  };
+
+  const handleTriggerRoadmapGeneration = async () => {
+    try {
+      setGeneratingRoadmap(true);
+      await apiClient('/agent/roadmap', {
+        method: 'POST',
+        body: JSON.stringify({ targetRole: candidate?.headline || 'Senior Software Engineer' }),
+      });
+      await fetchTasks();
+      // Add chat message
+      const roadmapNotice: ChatMessage = {
+        id: Date.now().toString(),
+        sender: 'agent',
+        text: `🎯 I have scheduled a new **7-Day Interview Sprint** into your Career Tasks pipeline! You can check off each daily milestone as you prepare.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, roadmapNotice]);
+    } catch (err: any) {
+      alert(`Error creating sprint: ${err.message}`);
+    } finally {
+      setGeneratingRoadmap(false);
+    }
+  };
+
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
@@ -121,10 +217,10 @@ export default function CareerAgentPage() {
         </div>
       </div>
 
-      {/* Grid: Chat on Left, Agent Tools & Roadmaps on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chat / Interaction Feed (2 columns) */}
-        <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col h-[650px] overflow-hidden">
+      {/* Grid: Chat on Left (7 cols), Tasks & Roadmap on Right (5 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Chat / Interaction Feed (7 cols) */}
+        <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col h-[700px] overflow-hidden">
           {/* Top Chat Bar */}
           <div className="px-5 py-3.5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -159,11 +255,11 @@ export default function CareerAgentPage() {
                 <div
                   className={`max-w-xl rounded-xl p-4 text-xs leading-relaxed space-y-3 ${
                     msg.sender === 'user'
-                      ? 'bg-[#2563EB] text-white'
+                      ? 'bg-[#2563EB] text-white shadow-md'
                       : 'bg-slate-800/80 border border-slate-700/60 text-slate-200'
                   }`}
                 >
-                  <p>{msg.text}</p>
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
                   {msg.actions && msg.actions.length > 0 && (
                     <div className="pt-2 border-t border-slate-700/50 flex flex-wrap gap-1.5">
                       {msg.actions.map((act, i) => (
@@ -213,8 +309,103 @@ export default function CareerAgentPage() {
           </form>
         </div>
 
-        {/* Right Sidebar: Active Roadmaps & Quick Tools */}
-        <div className="space-y-5">
+        {/* Right Sidebar: Active Sprint & Tasks Checklist (5 cols) */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* Active 7-Day Sprint Checklist */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-amber-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Career Tasks & Milestones
+                </h3>
+              </div>
+              <button
+                onClick={handleTriggerRoadmapGeneration}
+                disabled={generatingRoadmap}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold transition-all disabled:opacity-50"
+              >
+                <Sparkles className={`h-3 w-3 ${generatingRoadmap ? 'animate-spin' : ''}`} />
+                <span>{generatingRoadmap ? 'Scheduling...' : '+ New 7-Day Sprint'}</span>
+              </button>
+            </div>
+
+            {tasksLoading ? (
+              <div className="py-8 text-center text-xs text-slate-500">Loading career milestones...</div>
+            ) : tasks.length === 0 ? (
+              <div className="py-8 text-center space-y-3">
+                <Clock className="h-8 w-8 text-slate-600 mx-auto" />
+                <p className="text-xs text-slate-400">No active milestones in your sprint.</p>
+                <button
+                  onClick={handleTriggerRoadmapGeneration}
+                  disabled={generatingRoadmap}
+                  className="px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-blue-500 text-white text-xs font-semibold shadow-md"
+                >
+                  Generate 7-Day Interview Sprint
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                {tasks.map((task) => {
+                  const isDone = task.status === 'completed';
+                  const milestoneDay = task.payload?.milestoneDay;
+
+                  return (
+                    <div
+                      key={task._id}
+                      className={`p-3 rounded-lg border transition-all flex items-start gap-3 ${
+                        isDone
+                          ? 'bg-slate-950/40 border-slate-800/60 opacity-60'
+                          : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <button
+                        onClick={() => handleToggleTaskStatus(task)}
+                        className="mt-0.5 text-slate-400 hover:text-cyan-400 shrink-0"
+                      >
+                        {isDone ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        ) : (
+                          <Circle className="h-4 w-4" />
+                        )}
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {milestoneDay && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              Day {milestoneDay}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs font-semibold ${
+                              isDone ? 'line-through text-slate-500' : 'text-white'
+                            }`}
+                          >
+                            {task.title}
+                          </span>
+                        </div>
+                        {task.payload?.description && (
+                          <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                            {task.payload.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteTask(task._id)}
+                        className="p-1 text-slate-600 hover:text-rose-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete task"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Transparent Match Formula Card */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
@@ -226,7 +417,7 @@ export default function CareerAgentPage() {
             </p>
             <div className="space-y-2 text-[11px] font-mono">
               <div className="p-2 rounded bg-slate-950/80 border border-slate-800 flex justify-between">
-                <span className="text-slate-400">Hard Requirements:</span>
+                <span className="text-slate-400">Hard Prerequisites:</span>
                 <span className="text-emerald-400 font-bold">40% weight</span>
               </div>
               <div className="p-2 rounded bg-slate-950/80 border border-slate-800 flex justify-between">
@@ -236,46 +427,6 @@ export default function CareerAgentPage() {
               <div className="p-2 rounded bg-slate-950/80 border border-slate-800 flex justify-between">
                 <span className="text-slate-400">Contextual Experience:</span>
                 <span className="text-amber-400 font-bold">20% weight</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 7-Day Interview Roadmap Preview */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-400" />
-                <span>7-Day Interview Sprint</span>
-              </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Active Plan
-              </span>
-            </div>
-            <div className="space-y-2.5 text-xs">
-              <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-white">Day 1-2: Core Architecture</div>
-                  <div className="text-[11px] text-slate-400">Review concurrency, memory management & DB indexing.</div>
-                </div>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                <div className="h-4 w-4 rounded-full border border-cyan-400/60 text-[10px] text-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
-                  3
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Day 3-4: Distributed Systems</div>
-                  <div className="text-[11px] text-slate-400">Kafka queues, horizontal partitioning & caching layers.</div>
-                </div>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 flex items-start gap-2.5 opacity-60">
-                <div className="h-4 w-4 rounded-full border border-slate-600 text-[10px] text-slate-400 flex items-center justify-center shrink-0 mt-0.5">
-                  5
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Day 5-7: Behavioral & Mock Pitch</div>
-                  <div className="text-[11px] text-slate-400">STAR method behavioral stories & reverse question prep.</div>
-                </div>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api-client';
+import { ExplainabilityDrawer } from '@/components/jobs/ExplainabilityDrawer';
 import {
   MapPin,
   Building2,
@@ -36,6 +37,10 @@ export default function JobDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isExplainDrawerOpen, setIsExplainDrawerOpen] = useState(false);
+  const [userMatchScore, setUserMatchScore] = useState<number | null>(null);
+  const [userMatchedSkills, setUserMatchedSkills] = useState<string[]>([]);
+  const [userMissingSkills, setUserMissingSkills] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadJobDetail() {
@@ -57,6 +62,38 @@ export default function JobDetailPage() {
 
     loadJobDetail();
   }, [jobId]);
+
+  useEffect(() => {
+    async function loadCandidateMatch() {
+      if (!jobId || !user || user.role !== 'candidate') return;
+      try {
+        const res = await apiClient<{ match: any }>(`/agent/match/${jobId}`, {
+          method: 'POST',
+        });
+        if (res.match) {
+          setUserMatchScore(res.match.overallScore);
+          setUserMatchedSkills(res.match.breakdown?.skillOverlap?.matchedSkills || []);
+          setUserMissingSkills(res.match.breakdown?.skillOverlap?.missingSkills || []);
+        }
+      } catch {
+        // Fall back gracefully if session expired or offline
+      }
+    }
+
+    loadCandidateMatch();
+  }, [jobId, user]);
+
+  const handleTrackApplication = async (trackedJobId: string) => {
+    try {
+      await apiClient('/candidate/applications', {
+        method: 'POST',
+        body: JSON.stringify({ jobId: trackedJobId, status: 'applied' }),
+      });
+      alert('Application tracked successfully in your Candidate Pipeline!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to track application.');
+    }
+  };
 
   const handleToggleSave = async () => {
     if (!user) {
@@ -243,15 +280,21 @@ export default function JobDetailPage() {
                         AI CareerOS Fit Analysis
                       </h2>
                       <p className="text-[11px] text-slate-500">
-                        Deterministic qualification overlap & semantic skill gap analysis
+                        {user?.role === 'candidate'
+                          ? 'Personalized deterministic overlap & semantic skill gap analysis'
+                          : 'Benchmark competency requirements & qualification matrix'}
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <span className="text-2xl font-black text-[#06B6D4]">88%</span>
+                    <span className="text-2xl font-black text-[#06B6D4]">
+                      {user?.role === 'candidate' && userMatchScore !== null
+                        ? `${userMatchScore}%`
+                        : '85%'}
+                    </span>
                     <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">
-                      Strong Match
+                      {user?.role === 'candidate' ? 'Personalized Match' : 'Benchmark Estimate'}
                     </span>
                   </div>
                 </div>
@@ -263,7 +306,10 @@ export default function JobDetailPage() {
                       <CheckCircle2 className="h-4 w-4" /> Matched Competencies
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {job.skills.slice(0, 4).map((s: string, idx: number) => (
+                      {(user?.role === 'candidate' && userMatchedSkills.length > 0
+                        ? userMatchedSkills
+                        : job.skills.slice(0, 4)
+                      ).map((s: string, idx: number) => (
                         <span
                           key={idx}
                           className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200"
@@ -279,7 +325,10 @@ export default function JobDetailPage() {
                       <AlertTriangle className="h-4 w-4" /> Potential Gaps To Bridge
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {job.skills.slice(4).map((s: string, idx: number) => (
+                      {(user?.role === 'candidate' && userMissingSkills.length > 0
+                        ? userMissingSkills
+                        : job.skills.slice(4)
+                      ).map((s: string, idx: number) => (
                         <span
                           key={idx}
                           className="rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200"
@@ -292,20 +341,39 @@ export default function JobDetailPage() {
                 </div>
 
                 {/* AI Rationale & 7-Day Prep Roadmap CTA */}
-                <div className="rounded-xl bg-slate-900 text-white p-4 text-xs space-y-2">
+                <div className="rounded-xl bg-slate-900 text-white p-4 text-xs space-y-3">
                   <div className="flex items-center gap-2 font-bold text-[#06B6D4]">
-                    <Bot className="h-4 w-4" /> Why this match score was awarded:
+                    <Bot className="h-4 w-4" /> Transparent Match Engine Breakdown:
                   </div>
                   <p className="text-slate-300 text-xs leading-relaxed">
-                    This role strongly aligns with modern full-stack workflows. The core frameworks matches the experience benchmarks. Any specialized stack gaps can be covered in a customized 7-day preparation roadmap.
+                    Evaluated against 40% deterministic qualifications (experience bounds, work modality), 40% ATS competency overlap, and 20% contextual career progression.
                   </p>
-                  <div className="pt-2">
-                    <Link
-                      href="/app/career-agent"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2563EB] to-[#06B6D4] px-4 py-2 text-xs font-bold text-white hover:opacity-95 transition"
-                    >
-                      Ask Career Agent: Generate 7-Day Interview Roadmap →
-                    </Link>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    {user?.role === 'candidate' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setIsExplainDrawerOpen(true)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 px-3.5 py-2 text-xs font-bold text-white transition shadow-sm"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Audit Fit In-Depth (Explainability Drawer) &rarr;
+                        </button>
+                        <Link
+                          href="/app/career-agent"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 px-3.5 py-2 text-xs font-bold text-white transition"
+                        >
+                          Chat with Career Agent
+                        </Link>
+                      </>
+                    ) : (
+                      <Link
+                        href={`/login?redirect=/jobs/${jobId}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2563EB] to-[#06B6D4] px-4 py-2 text-xs font-bold text-white hover:opacity-95 transition"
+                      >
+                        Sign In as Candidate to Run Live Fit Analysis &rarr;
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -435,6 +503,25 @@ export default function JobDetailPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Explainability Drawer for In-Depth Fit Audit & Roadmap */}
+        {job && (
+          <ExplainabilityDrawer
+            jobId={jobId}
+            jobTitle={job.title}
+            companyName={job.companyId?.name || 'Company'}
+            isOpen={isExplainDrawerOpen}
+            onClose={() => setIsExplainDrawerOpen(false)}
+            onTrackApplication={handleTrackApplication}
+            initialScore={userMatchScore || 85}
+            initialMatchedSkills={
+              userMatchedSkills.length > 0 ? userMatchedSkills : job.skills.slice(0, 4)
+            }
+            initialMissingSkills={
+              userMissingSkills.length > 0 ? userMissingSkills : job.skills.slice(4)
+            }
+          />
         )}
       </main>
 

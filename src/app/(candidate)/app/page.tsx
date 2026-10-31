@@ -13,14 +13,23 @@ import {
   ChevronRight, 
   Clock, 
   Building2,
-  AlertCircle
+  AlertCircle,
+  CheckSquare,
+  Square,
+  Zap,
+  Calendar,
+  Layers,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { ExplainabilityDrawer } from '@/components/jobs/ExplainabilityDrawer';
 
 export default function CandidateDashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [explainJob, setExplainJob] = useState<any | null>(null);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -34,8 +43,41 @@ export default function CandidateDashboardPage() {
         setLoading(false);
       }
     }
+
+    async function fetchTasks() {
+      try {
+        setTasksLoading(true);
+        const res = await apiClient<{ count: number; tasks: any[] }>('/agent/tasks');
+        setTasks(res.tasks || []);
+      } catch {
+        // Soft fail
+      } finally {
+        setTasksLoading(false);
+      }
+    }
+
     fetchDashboard();
+    fetchTasks();
   }, []);
+
+  const handleToggleTask = async (taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    setTasks((prev) =>
+      prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t))
+    );
+
+    try {
+      await apiClient(`/agent/tasks/${taskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch {
+      // Revert on error
+      setTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? { ...t, status: currentStatus } : t))
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -154,14 +196,21 @@ export default function CandidateDashboardPage() {
           </p>
         </Link>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+        <Link
+          href="/app/career-agent"
+          className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 hover:border-cyan-500/40 transition-colors group"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-3">
             <span className="text-xs font-medium uppercase tracking-wider">Preparation Tasks</span>
-            <Clock className="h-4 w-4 text-amber-400" />
+            <Clock className="h-4 w-4 text-amber-400 group-hover:text-cyan-400 transition-colors" />
           </div>
-          <div className="text-3xl font-extrabold text-white">{stats?.tasksDue || 2}</div>
-          <p className="text-[11px] text-slate-500 mt-1">7-day interview roadmaps</p>
-        </div>
+          <div className="text-3xl font-extrabold text-white">
+            {tasks.filter((t) => t.status === 'pending').length || stats?.tasksDue || 0}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 group-hover:text-cyan-400 transition-colors">
+            7-day sprint milestones <ArrowRight className="h-3 w-3" />
+          </p>
+        </Link>
       </div>
 
       {/* Top AI-Ranked Matches Section */}
@@ -190,10 +239,15 @@ export default function CandidateDashboardPage() {
                     <h3 className="text-sm font-bold text-white line-clamp-1">{job.title}</h3>
                     <p className="text-xs text-slate-400 mt-0.5">{job.companyId?.name || 'Verified Company'}</p>
                   </div>
-                  <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 font-mono text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setExplainJob(job)}
+                    title="Audit transparent match calculation"
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 font-mono text-xs font-bold hover:border-cyan-400 hover:bg-cyan-900/80 transition"
+                  >
                     <Sparkles className="h-3 w-3" />
                     {job.matchScore}%
-                  </div>
+                  </button>
                 </div>
 
                 <div className="text-xs text-slate-400 space-y-1 mb-4">
@@ -228,22 +282,131 @@ export default function CandidateDashboardPage() {
               </div>
 
               <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                <Link
-                  href={`/jobs/${job._id}`}
-                  className="text-xs font-semibold text-cyan-400 hover:underline"
+                <button
+                  type="button"
+                  onClick={() => setExplainJob(job)}
+                  className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"
                 >
-                  View Role Details &rarr;
-                </Link>
-                <Link
-                  href={`/jobs/${job._id}`}
-                  className="px-3 py-1 rounded-lg bg-[#2563EB] text-white text-xs font-semibold hover:bg-blue-500 transition-colors"
-                >
-                  Apply
-                </Link>
+                  <Sparkles className="h-3 w-3" /> Audit Fit
+                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/jobs/${job._id}`}
+                    className="text-xs text-slate-400 hover:text-white"
+                  >
+                    Details
+                  </Link>
+                  <Link
+                    href={`/jobs/${job._id}`}
+                    className="px-3 py-1 rounded-lg bg-[#2563EB] text-white text-xs font-semibold hover:bg-blue-500 transition-colors"
+                  >
+                    Apply
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 7-Day Sprint Milestones & Tasks Widget */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-cyan-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-white">
+              7-Day Sprint & Interview Preparation Tasks
+            </h2>
+          </div>
+          <Link
+            href="/app/career-agent"
+            className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
+          >
+            Open Career Agent Workspace <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
+
+        {tasksLoading ? (
+          <div className="p-6 text-center text-xs text-slate-500 animate-pulse">
+            Loading scheduled sprint tasks...
+          </div>
+        ) : tasks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {tasks.slice(0, 6).map((task: any) => {
+              const isCompleted = task.status === 'completed';
+              return (
+                <div
+                  key={task._id}
+                  onClick={() => handleToggleTask(task._id, task.status)}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    isCompleted
+                      ? 'border-emerald-900/40 bg-emerald-950/10 text-slate-500'
+                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 text-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="mt-0.5 text-cyan-400 hover:text-cyan-300"
+                    title={isCompleted ? 'Mark as pending' : 'Mark as complete'}
+                  >
+                    {isCompleted ? (
+                      <CheckSquare className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <Square className="h-4 w-4 text-slate-500" />
+                    )}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          isCompleted ? 'line-through text-slate-500' : 'text-white'
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                          task.priority === 'critical'
+                            ? 'bg-rose-950/60 text-rose-400 border-rose-800/60'
+                            : task.priority === 'high'
+                            ? 'bg-amber-950/60 text-amber-400 border-amber-800/60'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                      >
+                        {task.priority || 'sprint'}
+                      </span>
+                    </div>
+                    {task.description && (
+                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">
+                        {task.description}
+                      </p>
+                    )}
+                    {task.dueAt && (
+                      <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> Due {new Date(task.dueAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-8 text-center rounded-xl border border-dashed border-slate-800 bg-slate-950/30">
+            <Zap className="h-8 w-8 text-slate-600 mx-auto mb-2" />
+            <p className="text-xs text-slate-300 font-semibold">No preparation tasks in your sprint backlog</p>
+            <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
+              Ask your AI Career Agent to generate a 7-day interview preparation roadmap for any bookmarked or recommended role.
+            </p>
+            <Link
+              href="/app/career-agent"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2 text-xs font-bold text-white hover:opacity-90 transition"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate Sprint Roadmap in Career Agent
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Split Section: Active Resume Center Snapshot & Recent Application Pipeline */}
@@ -342,6 +505,18 @@ export default function CandidateDashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Explainability Drawer */}
+      <ExplainabilityDrawer
+        jobId={explainJob?._id || ''}
+        jobTitle={explainJob?.title || ''}
+        companyName={explainJob?.companyId?.name || 'Verified Company'}
+        isOpen={!!explainJob}
+        onClose={() => setExplainJob(null)}
+        initialScore={explainJob?.matchScore || 75}
+        initialMatchedSkills={explainJob?.matchedSkills || []}
+        initialMissingSkills={explainJob?.missingSkills || []}
+      />
     </div>
   );
 }

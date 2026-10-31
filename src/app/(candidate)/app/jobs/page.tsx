@@ -16,6 +16,7 @@ import {
   Info
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { ExplainabilityDrawer } from '@/components/jobs/ExplainabilityDrawer';
 
 export default function CandidateJobsFeedPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -227,80 +228,17 @@ export default function CandidateJobsFeedPage() {
       )}
 
       {/* Explainability Drawer */}
-      {explainJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm">
-          <div className="relative h-full w-full max-w-md bg-slate-900 border-l border-slate-800 p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-cyan-400" />
-                  <h3 className="text-sm font-bold text-white">Explainable Fit Analysis</h3>
-                </div>
-                <button
-                  onClick={() => setExplainJob(null)}
-                  className="p-1 text-slate-400 hover:text-white rounded-lg"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div>
-                <h4 className="text-base font-bold text-white">{explainJob.title}</h4>
-                <p className="text-xs text-slate-400 mt-0.5">{explainJob.companyId?.name || 'Company'}</p>
-                <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950 border border-cyan-700 text-cyan-300 font-bold font-mono text-sm">
-                  {explainJob.matchScore}% Overall Compatibility
-                </div>
-              </div>
-
-              <div className="space-y-4 text-xs">
-                <div>
-                  <h5 className="font-bold text-emerald-400 mb-2">Verified Competency Overlap:</h5>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(explainJob.matchedSkills || []).map((s: string) => (
-                      <span key={s} className="px-2 py-1 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-300">
-                        ✓ {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h5 className="font-bold text-amber-400 mb-2">Identified Skill Gaps:</h5>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(explainJob.missingSkills || []).map((s: string) => (
-                      <span key={s} className="px-2 py-1 rounded bg-slate-800 text-slate-300">
-                        + {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-950/20 text-slate-300 leading-relaxed text-[11px]">
-                  <strong>AI Rationale:</strong> Your profile exhibits strong core competencies required for this role. Adding projects demonstrating familiarity with the identified skill gaps will maximize interview conversion.
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
-              <button
-                onClick={() => setExplainJob(null)}
-                className="text-xs text-slate-400 hover:text-white"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  handleTrackApplication(explainJob._id);
-                  setExplainJob(null);
-                }}
-                className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
-              >
-                Add to Pipeline Tracker
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExplainabilityDrawer
+        jobId={explainJob?._id || ''}
+        jobTitle={explainJob?.title || ''}
+        companyName={explainJob?.companyId?.name || 'Verified Company'}
+        isOpen={!!explainJob}
+        onClose={() => setExplainJob(null)}
+        onTrackApplication={handleTrackApplication}
+        initialScore={explainJob?.matchScore || 75}
+        initialMatchedSkills={explainJob?.matchedSkills || []}
+        initialMissingSkills={explainJob?.missingSkills || []}
+      />
     </div>
   );
 }
