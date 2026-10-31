@@ -106,7 +106,20 @@ apiClient.put = async function <T = any>(endpoint: string, body?: any, options?:
   return { data };
 };
 
-apiClient.delete = async function <T = any>(endpoint: string, options?: RequestInit) {
-  const data = await apiClient<T>(endpoint, { ...options, method: 'DELETE' });
+apiClient.delete = async function <T = any>(
+  endpoint: string,
+  bodyOrOptions?: any,
+  options?: RequestInit
+) {
+  let reqOptions: RequestInit = {};
+  if (bodyOrOptions && (bodyOrOptions.headers || bodyOrOptions.credentials || bodyOrOptions.signal)) {
+    reqOptions = bodyOrOptions;
+  } else if (bodyOrOptions !== undefined) {
+    reqOptions = {
+      ...options,
+      body: typeof bodyOrOptions === 'string' ? bodyOrOptions : JSON.stringify(bodyOrOptions),
+    };
+  }
+  const data = await apiClient<T>(endpoint, { ...reqOptions, method: 'DELETE' });
   return { data };
 };

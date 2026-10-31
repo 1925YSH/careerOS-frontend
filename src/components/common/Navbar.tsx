@@ -44,9 +44,9 @@ export function Navbar() {
             <Link href="/for-companies" className="hover:text-white transition-colors">
               For Employers
             </Link>
-            <Link href="/pricing" className="hover:text-white transition-colors">
-              Pricing
-            </Link>
+              <Link href="/pricing" className="hover:text-white transition-colors">
+                Pricing
+              </Link>
           </nav>
         </div>
 
