@@ -9,12 +9,17 @@ import {
   Download, 
   CheckCircle2, 
   AlertTriangle,
-  Lock
+  Lock,
+  Sparkles,
+  CreditCard,
+  ArrowRight
 } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 
 export default function CandidateSettingsPage() {
   const { user, logout } = useAuth();
+  const isPro = user?.subscription?.plan === 'pro';
   const [alerts, setAlerts] = useState({
     highMatchAlerts: true,
     taskReminders: true,
@@ -124,6 +129,56 @@ export default function CandidateSettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* Subscription & Commercial Billing */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white font-bold text-sm uppercase tracking-wider">
+            <CreditCard className="h-4 w-4 text-cyan-400" />
+            Subscription & Commercial Plan
+          </div>
+          <span
+            className={`px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border ${
+              isPro
+                ? 'bg-cyan-950/80 text-cyan-400 border-cyan-800'
+                : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+          >
+            {isPro ? 'CareerOS Pro' : 'Free Basic Tier'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          <div className="p-3.5 rounded-lg border border-slate-800 bg-slate-950/60 space-y-1">
+            <p className="text-[11px] text-slate-400 font-medium">7-Day Interview Roadmaps</p>
+            <p className="text-sm font-bold text-white">
+              {isPro ? 'Unlimited Roadmaps' : '2 Generations / Week'}
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-slate-800 bg-slate-950/60 space-y-1">
+            <p className="text-[11px] text-slate-400 font-medium">ATS Diagnostics & Priority Alerts</p>
+            <p className="text-sm font-bold text-white">
+              {isPro ? 'Enabled (Instant Push)' : 'Standard Format Check'}
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-2 flex items-center justify-between">
+          <p className="text-xs text-slate-400">
+            {isPro
+              ? 'Your subscription is active. Billed via Stripe.'
+              : 'Upgrade to unlock unlimited 7-day interview roadmaps and deep ATS diagnostics.'}
+          </p>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:opacity-95 transition"
+          >
+            <span>{isPro ? 'Manage Plan' : 'Upgrade to Pro ($19/mo)'}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
 
       {/* Privacy & Data Portability (DPDP / GDPR) */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6 space-y-4">

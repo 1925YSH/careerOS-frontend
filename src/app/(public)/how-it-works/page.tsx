@@ -2,20 +2,21 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { 
-  Globe, 
-  Download, 
-  Cpu, 
-  Sparkles, 
-  CheckCircle2, 
-  Fingerprint, 
-  Target, 
+import {
+  Globe,
+  Download,
+  Cpu,
+  Sparkles,
+  CheckCircle2,
+  Fingerprint,
+  Target,
   ArrowRight,
   ShieldCheck,
   FileText,
   Compass,
   CheckCircle
 } from 'lucide-react';
+import { Navbar } from '@/components/common/Navbar';
 
 export default function HowItWorksPage() {
   const ingestionPipeline = [
@@ -82,6 +83,7 @@ export default function HowItWorksPage() {
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-white">
+      <Navbar />
       {/* Hero Section */}
       <section className="relative overflow-hidden py-24 sm:py-32 border-b border-slate-800">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-600/10 via-transparent to-transparent pointer-events-none" />

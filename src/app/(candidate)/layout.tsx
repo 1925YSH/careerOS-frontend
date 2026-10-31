@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { apiClient } from '@/lib/api-client';
 import {
   Sparkles,
   LayoutDashboard,
@@ -19,7 +20,8 @@ import {
   ChevronRight,
   ShieldCheck,
   CheckCircle2,
-  Bell
+  Bell,
+  CheckSquare,
 } from 'lucide-react';
 
 interface CandidateLayoutProps {
@@ -31,16 +33,33 @@ export default function CandidateLayout({ children }: CandidateLayoutProps) {
   const router = useRouter();
   const { user, profile, logout, isLoading } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isLoading && (!user || user.role !== 'candidate')) {
       router.push('/login?redirect=/app');
     }
   }, [user, isLoading, router]);
 
+  useEffect(() => {
+    async function loadUnreadCount() {
+      if (user && user.role === 'candidate') {
+        try {
+          const res = await apiClient<{ unreadCount: number }>('/notifications/unread-count');
+          setUnreadCount(res.unreadCount || 0);
+        } catch {
+          // Graceful fallback
+        }
+      }
+    }
+    loadUnreadCount();
+  }, [user, pathname]);
+
   const navItems = [
     { label: 'Overview', href: '/app', icon: LayoutDashboard },
     { label: 'AI Career Agent', href: '/app/career-agent', icon: Sparkles },
+    { label: 'Career Tasks', href: '/app/tasks', icon: CheckSquare },
+    { label: 'Notifications', href: '/app/notifications', icon: Bell, badge: unreadCount },
     { label: 'Jobs for You', href: '/app/jobs', icon: Compass },
     { label: 'Applications', href: '/app/applications', icon: Briefcase },
     { label: 'Resume Center', href: '/app/resume', icon: FileText },
@@ -92,12 +111,35 @@ export default function CandidateLayout({ children }: CandidateLayoutProps) {
                     : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="ml-auto rounded-full bg-cyan-500/20 border border-cyan-500/30 px-1.5 py-0.2 text-[10px] font-bold text-cyan-300">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
+
+        {/* Plan Status Banner */}
+        <div className="p-3 mx-3 mb-2 rounded-xl border border-slate-800 bg-slate-950/60">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-cyan-400" />
+              {user?.subscription?.plan === 'pro' ? 'CareerOS Pro' : 'Free Tier'}
+            </span>
+            <Link
+              href="/pricing"
+              className="text-[10px] font-bold text-cyan-400 hover:underline"
+            >
+              {user?.subscription?.plan === 'pro' ? 'Plan' : 'Upgrade'} &rarr;
+            </Link>
+          </div>
+        </div>
 
         {/* User Card */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/40">
@@ -145,6 +187,17 @@ export default function CandidateLayout({ children }: CandidateLayoutProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/app/notifications"
+              className="relative p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              title="Notifications"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-cyan-400 ring-2 ring-slate-900 animate-pulse" />
+              )}
+            </Link>
+            <div className="h-4 w-px bg-slate-800 hidden sm:block" />
             <Link
               href="/jobs"
               className="text-xs text-slate-400 hover:text-cyan-400 transition-colors hidden sm:inline"

@@ -13,6 +13,12 @@ export interface User {
   status: string;
   emailVerified: boolean;
   createdAt: string;
+  subscription?: {
+    plan: string;
+    status: string;
+    billingCycle?: string;
+    currentPeriodEnd?: string;
+  };
 }
 
 export interface CandidateProfile {
