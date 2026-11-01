@@ -44,9 +44,9 @@ export function Navbar() {
             <Link href="/for-companies" className="hover:text-white transition-colors">
               For Employers
             </Link>
-            <Link href="/resources" className="hover:text-white transition-colors">
-              Career Hub
-            </Link>
+              <Link href="/pricing" className="hover:text-white transition-colors">
+                Pricing
+              </Link>
           </nav>
         </div>
 
@@ -136,11 +136,11 @@ export function Navbar() {
             For Employers
           </Link>
           <Link
-            href="/resources"
+            href="/pricing"
             onClick={() => setMobileMenuOpen(false)}
             className="block text-base font-medium text-slate-200 hover:text-white"
           >
-            Career Hub
+            Pricing
           </Link>
           <div className="pt-4 border-t border-slate-800 flex flex-col gap-2">
             {user ? (

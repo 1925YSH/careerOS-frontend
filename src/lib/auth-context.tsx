@@ -8,10 +8,17 @@ export type UserRole = 'candidate' | 'company' | 'admin';
 export interface User {
   _id: string;
   email: string;
+  name?: string;
   role: UserRole;
   status: string;
   emailVerified: boolean;
   createdAt: string;
+  subscription?: {
+    plan: string;
+    status: string;
+    billingCycle?: string;
+    currentPeriodEnd?: string;
+  };
 }
 
 export interface CandidateProfile {
